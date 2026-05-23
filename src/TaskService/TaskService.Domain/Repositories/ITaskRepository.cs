@@ -1,5 +1,7 @@
 namespace TaskService.Domain.Repositories;
 
+using Domain.Entities;
+
 public interface ITaskRepository
 {
     Task<Entities.Task?> GetByIdAsync(Guid id, CancellationToken ct = default);

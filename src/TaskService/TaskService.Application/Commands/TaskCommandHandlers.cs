@@ -1,23 +1,21 @@
+namespace TaskService.Application.Commands;
+
 using TaskService.Application.Abstractions;
 using TaskService.Application.DTOs;
 using TaskService.Domain.Exceptions;
 using TaskService.Domain.Repositories;
 
-namespace TaskService.Application.Commands;
-
 public sealed class CreateTaskHandler(ITaskRepository repo)
     : ICommandHandler<CreateTaskCommand, TaskDto>
 {
     public async System.Threading.Tasks.Task<TaskDto> HandleAsync(
-        CreateTaskCommand cmd,
-        CancellationToken ct = default)
+        CreateTaskCommand cmd, CancellationToken ct = default)
     {
         var task = Domain.Entities.Task.Create(cmd.UserId, cmd.Title, cmd.Description);
 
         await repo.AddAsync(task, ct);
         await repo.SaveChangesAsync(ct);
 
-        // Aqui futuramente vamos publicar task.DomainEvents no RabbitMQ
         task.ClearEvents();
 
         return TaskMapper.ToDto(task);
@@ -25,14 +23,13 @@ public sealed class CreateTaskHandler(ITaskRepository repo)
 }
 
 public sealed class CompleteTaskHandler(ITaskRepository repo)
+    : ICommandHandler<CompleteTaskCommand, TaskDto>
 {
     public async System.Threading.Tasks.Task<TaskDto> HandleAsync(
-        CompleteTaskCommand cmd,
-        CancellationToken ct = default
-    )
+        CompleteTaskCommand cmd, CancellationToken ct = default)
     {
         var task = await repo.GetByIdAsync(cmd.TaskId, ct)
-          ?? throw new NotFoundException($"Task {cmd.TaskId} não encontrada.");
+            ?? throw new NotFoundException($"Task {cmd.TaskId} não encontrada.");
 
         task.Complete();
 
@@ -43,13 +40,11 @@ public sealed class CompleteTaskHandler(ITaskRepository repo)
     }
 }
 
-
 public sealed class DeleteTaskHandler(ITaskRepository repo)
     : ICommandHandler<DeleteTaskCommand, bool>
 {
     public async System.Threading.Tasks.Task<bool> HandleAsync(
-        DeleteTaskCommand cmd,
-        CancellationToken ct = default)
+        DeleteTaskCommand cmd, CancellationToken ct = default)
     {
         var task = await repo.GetByIdAsync(cmd.TaskId, ct)
             ?? throw new NotFoundException($"Task {cmd.TaskId} não encontrada.");
@@ -59,12 +54,4 @@ public sealed class DeleteTaskHandler(ITaskRepository repo)
 
         return true;
     }
-}
-
-// Mapper Local - simples, sem AutoMapper por enquanto
-file static class TaskMapper
-{
-    public static TaskDto ToDto(Domain.Entities.Task t) =>
-        new(t.Id, t.UserId, t.Title, t.Description,
-            t.Status.ToString(), t.CreatedAt, t.CompletedAt);
 }
