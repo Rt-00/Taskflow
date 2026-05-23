@@ -7,6 +7,9 @@ pkgs.mkShell {
     # Runtime e SDK
     dotnet-sdk_10
 
+    # EF Core
+    dotnet-ef
+
     # Ferramentas de banco
     postgresql_16
     redis
