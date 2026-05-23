@@ -1,4 +1,5 @@
 services:
+  # ── Infraestrutura ──────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -31,13 +32,93 @@ services:
       RABBITMQ_DEFAULT_USER: taskflow
       RABBITMQ_DEFAULT_PASS: taskflow
     ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # Management UI
+      - "5672:5672"
+      - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 10s
       retries: 5
+
+  # ── Serviços ─────────────────────────────────────────────────
+  user-service:
+    build:
+      context: ./src/UserService
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=taskflow;Username=taskflow;Password=taskflow"
+    ports:
+      - "5001:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # healthcheck:
+    #   # test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 15s
+
+  task-service:
+    build:
+      context: ./src/TaskService
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=taskflow;Username=taskflow;Password=taskflow"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: taskflow
+      RabbitMQ__Password: taskflow
+    ports:
+      - "5002:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    # healthcheck:
+    #   test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 15s
+
+  notification-service:
+    build:
+      context: ./src/NotificationService
+      dockerfile: Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Username: taskflow
+      RabbitMQ__Password: taskflow
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      context: ./src/ApiGateway
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Jwt__Key: "super-secret-key-troque-em-producao-32chars!!"
+      Jwt__Issuer: taskflow
+      Jwt__Audience: taskflow-clients
+      Jwt__ExpiresInMinutes: "60"
+      Redis__ConnectionString: "redis:6379"
+      ReverseProxy__Clusters__user-service__Destinations__primary__Address: "http://user-service:8080"
+      ReverseProxy__Clusters__task-service__Destinations__primary__Address: "http://task-service:8080"
+    ports:
+      - "5000:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      # user-service:
+      #   condition: service_healthy
+      # task-service:
+      #   condition: service_healthy
 
 volumes:
   postgres_data:
