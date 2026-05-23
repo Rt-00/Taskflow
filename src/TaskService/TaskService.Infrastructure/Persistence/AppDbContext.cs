@@ -2,11 +2,13 @@ namespace TaskService.Infrastructure.Persistence;
 
 using Microsoft.EntityFrameworkCore;
 using TaskService.Domain.Entities;
+using TaskService.Domain.Outbox;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : DbContext(options)
 {
     public DbSet<Task> Tasks => Set<Task>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -31,5 +33,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             // EF Core não persiste domain events — são transitórios
             b.Ignore(t => t.DomainEvents);
         });
+
+        mb.Entity<OutboxMessage>(b =>
+                {
+                    b.ToTable("outbox_messages");
+                    b.HasKey(o => o.Id);
+                    b.Property(o => o.Id).HasColumnName("id");
+                    b.Property(o => o.Type).HasColumnName("type").HasMaxLength(200).IsRequired();
+                    b.Property(o => o.Payload).HasColumnName("payload").IsRequired();
+                    b.Property(o => o.CreatedAt).HasColumnName("created_at");
+                    b.Property(o => o.ProcessedAt).HasColumnName("processed_at");
+                    b.HasIndex(o => o.ProcessedAt);  // índice para o polling ser eficiente
+                });
     }
 }
