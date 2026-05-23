@@ -1,3 +1,5 @@
+namespace TaskService.Infrastructure.Messaging;
+
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -5,8 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using TaskService.Infrastructure.Persistence;
-
-namespace TaskService.Infrastructure.Messaging;
 
 // BackgroundService roda em paralelo com a API, não bloqueia os requests
 public sealed class OutboxPublisher(

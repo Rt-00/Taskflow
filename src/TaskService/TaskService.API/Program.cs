@@ -5,6 +5,7 @@ using TaskService.Application.DTOs;
 using TaskService.Application.Queries;
 using TaskService.Domain.Exceptions;
 using TaskService.Domain.Repositories;
+using TaskService.Infrastructure.Messaging;
 using TaskService.Infrastructure.Persistence;
 using TaskService.Infrastructure.Repositories;
 
@@ -16,6 +17,8 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
 
 // Repositório
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
+builder.Services.AddHostedService<OutboxPublisher>();
 
 // Command handlers
 builder.Services.AddScoped<ICommandHandler<CreateTaskCommand, TaskDto>, CreateTaskHandler>();

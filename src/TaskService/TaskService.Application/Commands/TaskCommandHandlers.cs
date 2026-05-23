@@ -5,7 +5,7 @@ using TaskService.Application.DTOs;
 using TaskService.Domain.Exceptions;
 using TaskService.Domain.Repositories;
 
-public sealed class CreateTaskHandler(ITaskRepository repo)
+public sealed class CreateTaskHandler(ITaskRepository repo, IOutboxDispatcher outbox)
     : ICommandHandler<CreateTaskCommand, TaskDto>
 {
     public async System.Threading.Tasks.Task<TaskDto> HandleAsync(
@@ -14,15 +14,16 @@ public sealed class CreateTaskHandler(ITaskRepository repo)
         var task = Domain.Entities.Task.Create(cmd.UserId, cmd.Title, cmd.Description);
 
         await repo.AddAsync(task, ct);
-        await repo.SaveChangesAsync(ct);
 
-        task.ClearEvents();
+        // Salva a tarefa + evento outbox na mesma transação
+        outbox.Dispatch(task);
+        await repo.SaveChangesAsync(ct);
 
         return TaskMapper.ToDto(task);
     }
 }
 
-public sealed class CompleteTaskHandler(ITaskRepository repo)
+public sealed class CompleteTaskHandler(ITaskRepository repo, IOutboxDispatcher outbox)
     : ICommandHandler<CompleteTaskCommand, TaskDto>
 {
     public async System.Threading.Tasks.Task<TaskDto> HandleAsync(
@@ -33,14 +34,14 @@ public sealed class CompleteTaskHandler(ITaskRepository repo)
 
         task.Complete();
 
+        outbox.Dispatch(task);
         await repo.SaveChangesAsync(ct);
-        task.ClearEvents();
 
         return TaskMapper.ToDto(task);
     }
 }
 
-public sealed class DeleteTaskHandler(ITaskRepository repo)
+public sealed class DeleteTaskHandler(ITaskRepository repo, IOutboxDispatcher outbox)
     : ICommandHandler<DeleteTaskCommand, bool>
 {
     public async System.Threading.Tasks.Task<bool> HandleAsync(
@@ -50,6 +51,7 @@ public sealed class DeleteTaskHandler(ITaskRepository repo)
             ?? throw new NotFoundException($"Task {cmd.TaskId} não encontrada.");
 
         await repo.DeleteAsync(task, ct);
+        outbox.Dispatch(task);
         await repo.SaveChangesAsync(ct);
 
         return true;
